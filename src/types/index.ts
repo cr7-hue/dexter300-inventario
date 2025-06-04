@@ -1,7 +1,6 @@
-
 export type ProductCategory = string; 
 
-export const DEFAULT_PRODUCT_CATEGORIES: readonly ProductCategory[] = [
+export const DEFAULT_PRODUCT_CATEGORIES = [
   "Supermercado",
   "Alimentos",
   "Electrónica",
@@ -16,7 +15,7 @@ export const DEFAULT_PRODUCT_CATEGORIES: readonly ProductCategory[] = [
   "Restaurantes",
   "Servicios",
   "Otros",
-] as const;
+];
 
 export const LOCALSTORAGE_PRODUCTS_KEY = "shelfview_products";
 export const LOCALSTORAGE_CATEGORIES_KEY = "shelfview_user_categories";
@@ -32,15 +31,26 @@ export interface Product {
   name: string; 
   price: number; 
   category: ProductCategory; 
-  storeName?: string; 
-  notes?: string; 
+  storeName?: string | null; 
+  notes?: string | null; 
   isFavorite: boolean; 
   lastPriceCheck: string; 
-  latitude?: number; 
-  longitude?: number; 
+  latitude?: number | null; 
+  longitude?: number | null; 
   priceHistory?: PriceHistoryEntry[]; 
-  isPurchased?: boolean; 
-  purchaseDate?: string; 
+  isPurchased: boolean;
+  purchaseDate?: string | null; 
+}
+
+export interface ProductFormValues {
+  name: string;
+  price: number;
+  category: ProductCategory;
+  storeName?: string;
+  notes?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  isPurchased?: boolean;
 }
 
 // Added initialProducts directly here for easier management with page.tsx

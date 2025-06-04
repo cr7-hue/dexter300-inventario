@@ -1,15 +1,15 @@
-
 "use client";
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trash2, PlusCircle, ArrowLeft, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { DEFAULT_PRODUCT_CATEGORIES, LOCALSTORAGE_CATEGORIES_KEY, ProductCategory } from '@/types';
+import { DEFAULT_PRODUCT_CATEGORIES, ProductCategory } from '@/types';
 import { AppHeader } from '@/components/header';
+import { useCategories } from '@/contexts/CategoryContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,39 +24,10 @@ import {
 const TOAST_DURATION = 2000;
 
 export default function ManageCategoriesPage() {
-  const [categories, setCategories] = useState<ProductCategory[]>([...DEFAULT_PRODUCT_CATEGORIES]);
+  const { categories, addCategory, deleteCategory, loading } = useCategories();
   const [newCategory, setNewCategory] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<ProductCategory | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const storedCategories = localStorage.getItem(LOCALSTORAGE_CATEGORIES_KEY);
-    if (storedCategories) {
-      try {
-        const parsedCategories = JSON.parse(storedCategories);
-        if (Array.isArray(parsedCategories) && parsedCategories.every(cat => typeof cat === 'string')) {
-          setCategories(parsedCategories);
-        } else {
-          console.warn("Invalid category data in localStorage. Using default categories for this session.");
-          setCategories([...DEFAULT_PRODUCT_CATEGORIES]);
-          // DO NOT save default categories to localStorage if stored data was invalid
-        }
-      } catch (error) {
-        console.error("Error parsing categories from localStorage. Using default categories for this session:", error);
-        setCategories([...DEFAULT_PRODUCT_CATEGORIES]);
-        // DO NOT save default categories to localStorage on parse error
-      }
-    } else {
-      // No categories stored, use defaults and save them
-      setCategories([...DEFAULT_PRODUCT_CATEGORIES]);
-      localStorage.setItem(LOCALSTORAGE_CATEGORIES_KEY, JSON.stringify([...DEFAULT_PRODUCT_CATEGORIES]));
-    }
-  }, []);
-
-  const saveCategories = (updatedCategories: ProductCategory[]) => {
-    setCategories(updatedCategories);
-    localStorage.setItem(LOCALSTORAGE_CATEGORIES_KEY, JSON.stringify(updatedCategories));
-  };
 
   const handleAddCategory = (e: FormEvent) => {
     e.preventDefault();
@@ -79,8 +50,8 @@ export default function ManageCategoriesPage() {
       });
       return;
     }
-    const updatedCategories = [...categories, trimmedCategory].sort();
-    saveCategories(updatedCategories);
+    
+    addCategory(trimmedCategory);
     setNewCategory('');
     toast({
       title: 'Categoría Agregada',
@@ -92,7 +63,7 @@ export default function ManageCategoriesPage() {
   const handleDeleteCategory = () => {
     if (categoryToDelete) {
       if (DEFAULT_PRODUCT_CATEGORIES.includes(categoryToDelete as any) && categories.length <= DEFAULT_PRODUCT_CATEGORIES.length) {
-         toast({
+        toast({
           title: 'Acción no permitida',
           description: `La categoría predeterminada "${categoryToDelete}" no se puede eliminar si no hay categorías personalizadas adicionales.`,
           variant: 'destructive',
@@ -101,8 +72,8 @@ export default function ManageCategoriesPage() {
         setCategoryToDelete(null);
         return;
       }
-      const updatedCategories = categories.filter(cat => cat !== categoryToDelete);
-      saveCategories(updatedCategories);
+      
+      deleteCategory(categoryToDelete);
       toast({
         title: 'Categoría Eliminada',
         description: `"${categoryToDelete}" ha sido eliminada.`,
@@ -112,6 +83,14 @@ export default function ManageCategoriesPage() {
       setCategoryToDelete(null);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-8">

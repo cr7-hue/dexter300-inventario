@@ -1,9 +1,8 @@
-
 "use client";
 
 import type { Product } from "@/types";
-import type { ProductFormValues } from "@/components/product-form"; // Added
-import { useState, useEffect, useMemo, useRef } from "react"; // Added useRef
+import type { ProductFormValues } from "@/components/product-form";
+import { useState, useMemo } from "react";
 import Link from 'next/link';
 import { AppHeader } from "@/components/header";
 import { InventoryStats } from "@/components/InventoryStats";
@@ -23,75 +22,26 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ProductForm } from "@/components/product-form";
 import { useToast } from "@/hooks/use-toast";
-import { DEFAULT_PRODUCT_CATEGORIES, LOCALSTORAGE_PRODUCTS_KEY, LOCALSTORAGE_CATEGORIES_KEY } from "@/types"; // Added for categories
+import { useProducts } from "@/contexts/ProductContext";
+import { useCategories } from "@/contexts/CategoryContext";
 
 const MAX_PRICE_HISTORY_ENTRIES = 5;
 const TOAST_DURATION = 2000;
 
 export default function StatsPage() {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [userCategories, setUserCategories] = useState<string[]>([]); // Added for ProductForm
+  const { products, loading, addProduct, updateProduct, deleteProduct, toggleFavorite } = useProducts();
+  const { categories } = useCategories();
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [showFormDialog, setShowFormDialog] = useState(false);
-  const [formInitialValues, setFormInitialValues] = useState<ProductFormValues | null>(null); // For duplication
+  const [formInitialValues, setFormInitialValues] = useState<ProductFormValues | null>(null);
   const { toast } = useToast();
-  const isMounted = useRef(false); // To prevent localStorage writes on initial SSR/hydrate
-
-  useEffect(() => {
-    // Load products
-    const storedProductsRaw = localStorage.getItem(LOCALSTORAGE_PRODUCTS_KEY);
-    if (storedProductsRaw) {
-      try {
-        const parsedProducts = JSON.parse(storedProductsRaw);
-        if (Array.isArray(parsedProducts)) {
-          setAllProducts(parsedProducts);
-        } else {
-          console.error("Failed to load products from localStorage on stats page: data is not an array.");
-          setAllProducts([]); 
-        }
-      } catch (error) {
-        console.error("Error parsing products from localStorage on stats page:", error);
-        setAllProducts([]); 
-      }
-    } else {
-      setAllProducts([]); 
-    }
-
-    // Load categories (needed for ProductForm if opened from here)
-    const storedCategoriesRaw = localStorage.getItem(LOCALSTORAGE_CATEGORIES_KEY);
-    if (storedCategoriesRaw) {
-        try {
-            const parsed = JSON.parse(storedCategoriesRaw);
-            if (Array.isArray(parsed) && parsed.every(c => typeof c === 'string')) {
-                setUserCategories(parsed);
-            } else {
-                setUserCategories([...DEFAULT_PRODUCT_CATEGORIES]);
-            }
-        } catch {
-            setUserCategories([...DEFAULT_PRODUCT_CATEGORIES]);
-        }
-    } else {
-        setUserCategories([...DEFAULT_PRODUCT_CATEGORIES]);
-    }
-    isMounted.current = true;
-  }, []);
 
   const purchasedProducts = useMemo(() => {
-    return allProducts.filter(p => p.isPurchased).sort((a,b) => new Date(b.purchaseDate || 0).getTime() - new Date(a.purchaseDate || 0).getTime());
-  }, [allProducts]);
-  
-  // Function to save allProducts to localStorage
-  const saveProductsToLocalStorage = (productsToSave: Product[]) => {
-    if (isMounted.current) { // Only save if component is mounted and client-side
-        localStorage.setItem(LOCALSTORAGE_PRODUCTS_KEY, JSON.stringify(productsToSave));
-    }
-  };
-
+    return products.filter(p => p.isPurchased).sort((a,b) => new Date(b.purchaseDate || 0).getTime() - new Date(a.purchaseDate || 0).getTime());
+  }, [products]);
 
   const handleAddProductFromStats = (values: ProductFormValues) => {
-    // This function would be similar to handleAddProduct in page.tsx
-    // It's called when a duplicated product is saved via the form from this page.
     const currentDate = new Date().toISOString();
     const newProduct: Product = {
       ...values,
@@ -99,88 +49,89 @@ export default function StatsPage() {
       latitude: values.latitude === undefined || isNaN(values.latitude) ? undefined : values.latitude,
       longitude: values.longitude === undefined || isNaN(values.longitude) ? undefined : values.longitude,
       id: Date.now().toString(),
-      isFavorite: false, // Duplicates usually start non-favorite
+      isFavorite: false,
       lastPriceCheck: currentDate,
       priceHistory: [{ price: values.price, date: currentDate }],
-      isPurchased: values.isPurchased || false, // Can be set in form
+      isPurchased: values.isPurchased || false,
       purchaseDate: values.isPurchased ? currentDate : undefined,
     };
-    const updatedProductsList = [newProduct, ...allProducts];
-    setAllProducts(updatedProductsList);
-    saveProductsToLocalStorage(updatedProductsList);
+    addProduct(newProduct);
     setShowFormDialog(false);
     setFormInitialValues(null);
-    toast({ title: "Producto Duplicado y Agregado", description: `${values.name} ha sido agregado desde estadísticas.`, duration: TOAST_DURATION });
+    toast({ 
+      title: "Producto Duplicado y Agregado", 
+      description: `${values.name} ha sido agregado desde estadísticas.`, 
+      duration: TOAST_DURATION 
+    });
   };
 
-
   const handleEditProduct = (values: ProductFormValues, id: string) => {
+    if (!id) return;
+    
+    const productToUpdate = products.find(p => p.id === id);
+    if (!productToUpdate) return;
+
     const currentDate = new Date().toISOString();
-    const updatedProductsList = allProducts.map((p) => {
-      if (p.id === id) {
-        let updatedPriceHistory = p.priceHistory ? [...p.priceHistory] : [];
-        if (values.price !== p.price) {
-          if (updatedPriceHistory.length === 0 || (updatedPriceHistory[0].price !== p.price || updatedPriceHistory[0].date !== p.lastPriceCheck)) {
-            updatedPriceHistory.unshift({ price: p.price, date: p.lastPriceCheck });
-          }
-          if (updatedPriceHistory.length > MAX_PRICE_HISTORY_ENTRIES) {
-            updatedPriceHistory = updatedPriceHistory.slice(0, MAX_PRICE_HISTORY_ENTRIES);
-          }
-        } else if (updatedPriceHistory.length === 0) {
-           updatedPriceHistory.unshift({ price: values.price, date: currentDate });
-        }
-        
-        const wasPurchased = p.isPurchased;
-        const isNowPurchased = values.isPurchased || false;
-        let newPurchaseDate = p.purchaseDate;
-
-        if (isNowPurchased && !wasPurchased) {
-          newPurchaseDate = currentDate;
-        } else if (isNowPurchased && wasPurchased) {
-           newPurchaseDate = p.purchaseDate || currentDate;
-        } else if (!isNowPurchased) {
-          newPurchaseDate = undefined;
-        }
-
-        return { 
-          ...p, 
-          ...values,
-          storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
-          latitude: values.latitude === undefined || isNaN(values.latitude) ? undefined : values.latitude,
-          longitude: values.longitude === undefined || isNaN(values.longitude) ? undefined : values.longitude,
-          lastPriceCheck: currentDate,
-          priceHistory: updatedPriceHistory,
-          isPurchased: isNowPurchased,
-          purchaseDate: newPurchaseDate,
-        };
+    let updatedPriceHistory = productToUpdate.priceHistory ? [...productToUpdate.priceHistory] : [];
+    
+    if (values.price !== productToUpdate.price) {
+      if (updatedPriceHistory.length === 0 || 
+          (updatedPriceHistory[0].price !== productToUpdate.price || 
+           updatedPriceHistory[0].date !== productToUpdate.lastPriceCheck)) {
+        updatedPriceHistory.unshift({ price: productToUpdate.price, date: productToUpdate.lastPriceCheck });
       }
-      return p;
-    });
+      if (updatedPriceHistory.length > MAX_PRICE_HISTORY_ENTRIES) {
+        updatedPriceHistory = updatedPriceHistory.slice(0, MAX_PRICE_HISTORY_ENTRIES);
+      }
+    } else if (updatedPriceHistory.length === 0) {
+      updatedPriceHistory.unshift({ price: values.price, date: currentDate });
+    }
 
-    setAllProducts(updatedProductsList);
-    saveProductsToLocalStorage(updatedProductsList);
+    const wasPurchased = productToUpdate.isPurchased;
+    const isNowPurchased = values.isPurchased || false;
+    let newPurchaseDate = productToUpdate.purchaseDate;
+
+    if (isNowPurchased && !wasPurchased) {
+      newPurchaseDate = currentDate;
+    } else if (isNowPurchased && wasPurchased) {
+      newPurchaseDate = productToUpdate.purchaseDate || currentDate;
+    } else if (!isNowPurchased) {
+      newPurchaseDate = undefined;
+    }
+
+    const updatedProduct: Product = {
+      ...productToUpdate,
+      ...values,
+      storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
+      latitude: values.latitude === undefined || isNaN(values.latitude) ? undefined : values.latitude,
+      longitude: values.longitude === undefined || isNaN(values.longitude) ? undefined : values.longitude,
+      lastPriceCheck: currentDate,
+      priceHistory: updatedPriceHistory,
+      isPurchased: isNowPurchased,
+      purchaseDate: newPurchaseDate,
+    };
+
+    updateProduct(updatedProduct);
     setShowFormDialog(false);
     setEditingProduct(null);
-    setFormInitialValues(null);
-    toast({ title: "Producto Actualizado", description: `${values.name} ha sido actualizado.`, duration: TOAST_DURATION });
+    toast({ 
+      title: "Producto Actualizado", 
+      description: `${values.name} ha sido actualizado.`, 
+      duration: TOAST_DURATION 
+    });
   };
 
   const handleDeleteProduct = () => {
     if (productToDelete) {
-      const updatedProductsList = allProducts.filter((p) => p.id !== productToDelete.id);
-      setAllProducts(updatedProductsList);
-      saveProductsToLocalStorage(updatedProductsList);
-      toast({ title: "Producto Eliminado", description: `${productToDelete.name} ha sido eliminado.`, variant: "destructive", duration: TOAST_DURATION });
+      deleteProduct(productToDelete.id);
       setProductToDelete(null);
+      toast({
+        title: "Producto Eliminado",
+        description: `${productToDelete.name} ha sido eliminado.`,
+        variant: "destructive",
+        duration: TOAST_DURATION,
+      });
     }
-  };
-
-  const handleToggleFavorite = (productId: string) => {
-    const updatedProductsList = allProducts.map((p) =>
-      p.id === productId ? { ...p, isFavorite: !p.isFavorite } : p
-    );
-    setAllProducts(updatedProductsList);
-    saveProductsToLocalStorage(updatedProductsList);
   };
 
   const openFormForEdit = (product: Product) => {
@@ -189,22 +140,28 @@ export default function StatsPage() {
     setShowFormDialog(true);
   };
 
-  const openFormForDuplicateFromStats = (productToDuplicate: Product) => {
+  const openFormForDuplicateFromStats = (product: Product) => {
     setEditingProduct(null);
-    const initialData: ProductFormValues = {
-      name: productToDuplicate.name,
-      price: productToDuplicate.price,
-      category: productToDuplicate.category,
-      storeName: productToDuplicate.storeName || "",
-      latitude: productToDuplicate.latitude ?? undefined,
-      longitude: productToDuplicate.longitude ?? undefined,
-      notes: productToDuplicate.notes || "",
-      isPurchased: false, // Default for duplicate
-    };
-    setFormInitialValues(initialData);
+    setFormInitialValues({
+      name: `${product.name} (Copia)`,
+      price: product.price,
+      category: product.category,
+      storeName: product.storeName || "",
+      notes: product.notes || "",
+      latitude: product.latitude || null,
+      longitude: product.longitude || null,
+      isPurchased: false,
+    });
     setShowFormDialog(true);
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-8">
@@ -220,7 +177,7 @@ export default function StatsPage() {
         </Link>
       </div>
       
-      <InventoryStats products={allProducts} />
+      <InventoryStats products={products} />
 
       <h2 className="text-2xl font-semibold tracking-tight mt-10 mb-6 text-foreground">
         Mis Productos Comprados ({purchasedProducts.length})
@@ -229,8 +186,8 @@ export default function StatsPage() {
         products={purchasedProducts}
         onEdit={openFormForEdit}
         onDelete={(product) => setProductToDelete(product)}
-        onToggleFavorite={handleToggleFavorite}
-        onDuplicate={openFormForDuplicateFromStats} // Added duplicate handler
+        onToggleFavorite={toggleFavorite}
+        onDuplicate={openFormForDuplicateFromStats}
       />
       {purchasedProducts.length === 0 && (
         <p className="text-center text-muted-foreground mt-8">
@@ -241,19 +198,18 @@ export default function StatsPage() {
       <Dialog open={showFormDialog} onOpenChange={(isOpen) => {
         setShowFormDialog(isOpen);
         if (!isOpen) {
-            setEditingProduct(null);
-            setFormInitialValues(null);
+          setEditingProduct(null);
+          setFormInitialValues(null);
         }
       }}>
         <DialogContent className="sm:max-w-xl">
           <ProductForm
             productToEdit={editingProduct}
             initialDataForNew={formInitialValues}
-            userCategories={userCategories} // Pass categories
             onSubmit={(values, id) => {
-              if (id) { // Editing existing product
+              if (id) {
                 handleEditProduct(values, id);
-              } else { // Adding new (could be from duplication)
+              } else {
                 handleAddProductFromStats(values);
               }
             }}

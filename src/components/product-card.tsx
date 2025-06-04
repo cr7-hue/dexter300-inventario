@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Product } from "@/types";
@@ -77,7 +76,9 @@ export function ProductCard({ product, onEdit, onDelete, onToggleFavorite, onDup
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow space-y-2 pt-0 pb-3">
-        <p className="text-2xl font-semibold text-primary">${product.price.toFixed(2)}</p>
+        <p className="text-2xl font-semibold text-primary">
+          ${typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+        </p>
         
         {displayedPriceHistory.length > 0 && (
           <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
@@ -86,7 +87,7 @@ export function ProductCard({ product, onEdit, onDelete, onToggleFavorite, onDup
             </p>
             {displayedPriceHistory.map((entry, index) => (
               <p key={index} className="pl-5">
-                ${entry.price.toFixed(2)} <span className="text-xs opacity-80">({formatDate(entry.date, false)})</span>
+                ${typeof entry.price === 'number' ? entry.price.toFixed(2) : '0.00'} <span className="text-xs opacity-80">({formatDate(entry.date, false)})</span>
               </p>
             ))}
           </div>

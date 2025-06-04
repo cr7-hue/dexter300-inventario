@@ -1,8 +1,7 @@
-
 "use client";
 
-import type { Product, ProductCategory } from "@/types";
-import { DEFAULT_PRODUCT_CATEGORIES, LOCALSTORAGE_PRODUCTS_KEY, LOCALSTORAGE_CATEGORIES_KEY, initialProducts } from "@/types";
+import type { Product } from "@/types";
+import { DEFAULT_PRODUCT_CATEGORIES } from "@/types";
 import type { ProductFormValues } from "@/components/product-form";
 import { ProductForm } from "@/components/product-form";
 import { ProductList } from "@/components/product-list";
@@ -21,216 +20,134 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { PaginationControls } from "@/components/pagination-controls";
+import { useProducts } from "@/contexts/ProductContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCategories } from "@/contexts/CategoryContext";
+import { nullable } from "zod";
 
 const ITEMS_PER_PAGE = 4;
-const MAX_PRICE_HISTORY_ENTRIES = 5;
 const ALL_CATEGORIES_FILTER_VALUE = "Todas las categorías";
 const FAVORITES_FILTER_VALUE = "__FAVORITES__";
-const TOAST_DURATION = 2000; 
 
 export default function HomePage() {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [userCategories, setUserCategories] = useState<ProductCategory[]>([...DEFAULT_PRODUCT_CATEGORIES]);
-  const [clientHasMounted, setClientHasMounted] = useState(false);
-
+  const { user } = useAuth();
+  const { products, loading, addProduct, updateProduct, deleteProduct, toggleFavorite } = useProducts();
+  const { categories } = useCategories();
+  
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [formInitialValues, setFormInitialValues] = useState<ProductFormValues | null>(null); 
+  const [formInitialValues, setFormInitialValues] = useState<ProductFormValues | null>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORIES_FILTER_VALUE);
-  const [sortBy, setSortBy] = useState<string>("default"); 
+  const [sortBy, setSortBy] = useState<string>("default");
   const [sortOrder, setSortOrder] = useState<string>("asc");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { toast } = useToast();
-
-  useEffect(() => {
-    setClientHasMounted(true);
-  }, []);
-
-  // Load data from localStorage once client has mounted
-  useEffect(() => {
-    if (clientHasMounted) {
-      // Load products
-      try {
-        const storedProductsRaw = localStorage.getItem(LOCALSTORAGE_PRODUCTS_KEY);
-        if (storedProductsRaw) {
-          const parsedProducts = JSON.parse(storedProductsRaw);
-          if (Array.isArray(parsedProducts)) {
-            setProducts(parsedProducts);
-          } else {
-            console.warn("Invalid product data in localStorage. Using initial products for this session.");
-            // If data is invalid, state remains initialProducts. We ensure localStorage gets initialProducts if it was empty.
-            localStorage.setItem(LOCALSTORAGE_PRODUCTS_KEY, JSON.stringify(initialProducts));
-          }
-        } else {
-          // No product data, initialize localStorage with initialProducts. State is already initialProducts.
-          localStorage.setItem(LOCALSTORAGE_PRODUCTS_KEY, JSON.stringify(initialProducts));
-        }
-      } catch (error) {
-        console.error("Error loading products from localStorage. Using initial products for this session:", error);
-        // If parsing fails, state remains initialProducts. Initialize localStorage if it caused the error.
-         localStorage.setItem(LOCALSTORAGE_PRODUCTS_KEY, JSON.stringify(initialProducts));
-      }
-
-      // Load categories
-      try {
-        const storedCategoriesRaw = localStorage.getItem(LOCALSTORAGE_CATEGORIES_KEY);
-        if (storedCategoriesRaw) {
-          const parsedCategories = JSON.parse(storedCategoriesRaw);
-          if (Array.isArray(parsedCategories) && parsedCategories.every(cat => typeof cat === 'string')) {
-            setUserCategories(parsedCategories);
-          } else {
-            console.warn("Invalid category data in localStorage. Using default categories for this session.");
-            localStorage.setItem(LOCALSTORAGE_CATEGORIES_KEY, JSON.stringify(DEFAULT_PRODUCT_CATEGORIES));
-          }
-        } else {
-          localStorage.setItem(LOCALSTORAGE_CATEGORIES_KEY, JSON.stringify(DEFAULT_PRODUCT_CATEGORIES));
-        }
-      } catch (error) {
-        console.error("Error loading categories from localStorage. Using default categories for this session:", error);
-        localStorage.setItem(LOCALSTORAGE_CATEGORIES_KEY, JSON.stringify(DEFAULT_PRODUCT_CATEGORIES));
-      }
-    }
-  }, [clientHasMounted]);
-
-  // Save products to localStorage when they change
-  useEffect(() => {
-    if (clientHasMounted) { 
-        localStorage.setItem(LOCALSTORAGE_PRODUCTS_KEY, JSON.stringify(products));
-    }
-  }, [products, clientHasMounted]);
-
-  // Save categories to localStorage when they change
-  useEffect(() => {
-    if (clientHasMounted) {
-        localStorage.setItem(LOCALSTORAGE_CATEGORIES_KEY, JSON.stringify(userCategories));
-    }
-  }, [userCategories, clientHasMounted]);
-
+  const categoryFilterOptions: FilterOption[] = useMemo(() => [
+    { value: ALL_CATEGORIES_FILTER_VALUE, label: "Todas las categorías" },
+    { value: FAVORITES_FILTER_VALUE, label: "Solo Favoritos" },
+    ...categories.map(category => ({
+      value: category,
+      label: category
+    }))
+  ], [categories]);
 
   const handleAddProduct = (values: ProductFormValues) => {
     const currentDate = new Date().toISOString();
     const newProduct: Product = {
       ...values,
-      storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
-      latitude: values.latitude === undefined || isNaN(values.latitude) ? undefined : values.latitude,
-      longitude: values.longitude === undefined || isNaN(values.longitude) ? undefined : values.longitude,
       id: Date.now().toString(),
       isFavorite: false,
       lastPriceCheck: currentDate,
       priceHistory: [{ price: values.price, date: currentDate }],
       isPurchased: values.isPurchased || false,
       purchaseDate: values.isPurchased ? currentDate : undefined,
+      storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
+      latitude: values.latitude === undefined || values.latitude === null || isNaN(values.latitude) ? null : values.latitude,
+      longitude: values.longitude === undefined || values.longitude === null || isNaN(values.longitude) ? null : values.longitude,
     };
-    setProducts((prev) => [newProduct, ...prev]);
+    addProduct(newProduct);
     setShowFormDialog(false);
-    setFormInitialValues(null); 
-    setEditingProduct(null);
-    setSelectedCategory(ALL_CATEGORIES_FILTER_VALUE); 
-    toast({ title: "Producto Agregado", description: `${values.name} ha sido agregado exitosamente.`, duration: TOAST_DURATION });
+    setFormInitialValues(null);
   };
 
   const handleEditProduct = (values: ProductFormValues, id: string) => {
+    if (!id) return;
+    
+    const productToUpdate = products.find(p => p.id === id);
+    if (!productToUpdate) return;
+
     const currentDate = new Date().toISOString();
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === id) {
-          let updatedPriceHistory = p.priceHistory ? [...p.priceHistory] : [];
-          
-          if (values.price !== p.price) {
-            if (updatedPriceHistory.length === 0 || (updatedPriceHistory[0].price !== p.price || updatedPriceHistory[0].date !== p.lastPriceCheck)) {
-               updatedPriceHistory.unshift({ price: p.price, date: p.lastPriceCheck });
-            }
-            if (updatedPriceHistory.length > MAX_PRICE_HISTORY_ENTRIES) {
-              updatedPriceHistory = updatedPriceHistory.slice(0, MAX_PRICE_HISTORY_ENTRIES);
-            }
-          } else if (updatedPriceHistory.length === 0) { 
-             updatedPriceHistory.unshift({ price: values.price, date: currentDate });
-          }
-          
-          const wasPurchased = p.isPurchased;
-          const isNowPurchased = values.isPurchased || false;
-          let newPurchaseDate = p.purchaseDate;
+    let updatedPriceHistory = productToUpdate.priceHistory ? [...productToUpdate.priceHistory] : [];
+    
+    if (values.price !== productToUpdate.price) {
+      updatedPriceHistory.unshift({ price: productToUpdate.price, date: productToUpdate.lastPriceCheck });
+    }
 
-          if (isNowPurchased && !wasPurchased) { 
-            newPurchaseDate = currentDate;
-          } else if (isNowPurchased && wasPurchased) { 
-             newPurchaseDate = p.purchaseDate || currentDate; 
-          } else if (!isNowPurchased) { 
-            newPurchaseDate = undefined;
-          }
+    const wasPurchased = productToUpdate.isPurchased;
+    const isNowPurchased = values.isPurchased || false;
+    let newPurchaseDate = productToUpdate.purchaseDate;
 
-          return { 
-            ...p, 
-            ...values,
-            storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
-            latitude: values.latitude === undefined || isNaN(values.latitude) ? undefined : values.latitude,
-            longitude: values.longitude === undefined || isNaN(values.longitude) ? undefined : values.longitude,
-            lastPriceCheck: currentDate, 
-            priceHistory: updatedPriceHistory,
-            isPurchased: isNowPurchased,
-            purchaseDate: newPurchaseDate,
-          };
-        }
-        return p;
-      })
-    );
+    if (isNowPurchased && !wasPurchased) {
+      newPurchaseDate = currentDate;
+    } else if (isNowPurchased && wasPurchased) {
+      newPurchaseDate = productToUpdate.purchaseDate || currentDate;
+    } else if (!isNowPurchased) {
+      newPurchaseDate = undefined;
+    }
+
+    const updatedProduct: Product = {
+      ...productToUpdate,
+      ...values,
+      storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
+      latitude: values.latitude === undefined || values.latitude === null || isNaN(values.latitude) ? null : values.latitude,
+      longitude: values.longitude === undefined || values.longitude === null || isNaN(values.longitude) ? null : values.longitude,
+      lastPriceCheck: currentDate,
+      priceHistory: updatedPriceHistory,
+      isPurchased: isNowPurchased,
+      purchaseDate: newPurchaseDate,
+    };
+
+    updateProduct(id,updatedProduct);
     setShowFormDialog(false);
     setEditingProduct(null);
-    setFormInitialValues(null);
-    toast({ title: "Producto Actualizado", description: `${values.name} ha sido actualizado.`, duration: TOAST_DURATION });
   };
 
   const handleDeleteProduct = () => {
     if (productToDelete) {
-      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
-      toast({ title: "Producto Eliminado", description: `${productToDelete.name} ha sido eliminado.`, variant: "destructive", duration: TOAST_DURATION });
+      deleteProduct(productToDelete.id);
       setProductToDelete(null);
     }
   };
 
   const handleToggleFavorite = (productId: string) => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === productId ? { ...p, isFavorite: !p.isFavorite } : p
-      )
-    );
+    toggleFavorite(productId);
   };
 
   const openFormForEdit = (product: Product) => {
     setEditingProduct(product);
-    setFormInitialValues(null); 
-    setShowFormDialog(true);
-  };
-  
-  const openFormForAdd = () => {
-    setEditingProduct(null);
     setFormInitialValues(null);
     setShowFormDialog(true);
   };
 
-  const openFormForDuplicate = (productToDuplicate: Product) => {
-    setEditingProduct(null); 
-    const initialData: ProductFormValues = {
-      name: productToDuplicate.name,
-      price: productToDuplicate.price,
-      category: productToDuplicate.category,
-      storeName: productToDuplicate.storeName || "",
-      latitude: productToDuplicate.latitude ?? undefined,
-      longitude: productToDuplicate.longitude ?? undefined,
-      notes: productToDuplicate.notes || "",
-      isPurchased: false, 
-    };
-    setFormInitialValues(initialData);
+  const openFormForDuplicate = (product: Product) => {
+    setEditingProduct(null);
+    setFormInitialValues({
+      name: `${product.name} (Copia)`,
+      price: product.price,
+      category: product.category,
+      storeName: product.storeName || "",
+      notes: product.notes || "",
+      latitude: product.latitude || null,
+      longitude: product.longitude || null,
+      isPurchased: false,
+    });
     setShowFormDialog(true);
   };
-
 
   const baseFilteredAndSortedProducts = useMemo(() => {
     let tempProducts = [...products];
@@ -242,10 +159,10 @@ export default function HomePage() {
     }
 
     if (searchTerm.trim() !== "") {
-        tempProducts = tempProducts.filter((product) =>
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (product.storeName && product.storeName.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
+      tempProducts = tempProducts.filter((product) =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.storeName && product.storeName.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
     }
 
     if (sortBy !== "default") {
@@ -258,136 +175,139 @@ export default function HomePage() {
         } else if (sortBy === "storeName") {
           comparison = (a.storeName || '').localeCompare(b.storeName || '');
         } else if (sortBy === "lastPriceCheck") {
-          comparison = new Date(b.lastPriceCheck).getTime() - new Date(a.lastPriceCheck).getTime(); 
+          comparison = new Date(b.lastPriceCheck).getTime() - new Date(a.lastPriceCheck).getTime();
         }
         return sortOrder === "asc" ? comparison : -comparison;
       });
     } else {
-       tempProducts.sort((a, b) => new Date(b.lastPriceCheck).getTime() - new Date(a.lastPriceCheck).getTime());
+      tempProducts.sort((a, b) => new Date(b.lastPriceCheck).getTime() - new Date(a.lastPriceCheck).getTime());
     }
     return tempProducts;
   }, [products, searchTerm, selectedCategory, sortBy, sortOrder]);
 
-  useEffect(() => {
-    setCurrentPage(1); 
-  }, [searchTerm, selectedCategory, sortBy, sortOrder]);
-
-  const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(baseFilteredAndSortedProducts.length / ITEMS_PER_PAGE));
-  }, [baseFilteredAndSortedProducts.length]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages); 
-    }
-  }, [currentPage, totalPages]);
-
-  const paginatedProducts = useMemo(() => {
-    if (!clientHasMounted) { // Avoid slicing an empty array during SSR or before client hydration
-        return initialProducts.slice(0, ITEMS_PER_PAGE); // Or return empty array: []
-    }
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return baseFilteredAndSortedProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [baseFilteredAndSortedProducts, currentPage, clientHasMounted]);
+  const totalPages = Math.max(1, Math.ceil(baseFilteredAndSortedProducts.length / ITEMS_PER_PAGE));
+  const paginatedProducts = baseFilteredAndSortedProducts.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+    setCurrentPage(page);
+  };
+
+  const handleFormSubmit = (values: ProductFormValues) => {
+    if (editingProduct) {
+      handleEditProduct(values, editingProduct.id);
+    } else {
+      handleAddProduct(values);
     }
   };
-  
-  const categoryFilterOptions = useMemo((): FilterOption[] => {
-    const sortedUserCategories = [...userCategories].sort();
-    return [
-      { value: ALL_CATEGORIES_FILTER_VALUE, label: "Todas las categorías" },
-      { value: FAVORITES_FILTER_VALUE, label: "Solo Favoritos" },
-      ...sortedUserCategories.map(cat => ({ value: cat, label: cat }))
-    ];
-  }, [userCategories]);
 
+  const resetFormState = () => {
+    setShowFormDialog(false);
+    setEditingProduct(null);
+    setFormInitialValues(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-8">
       <AppHeader />
-      <Filters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-        categoryFilterOptions={categoryFilterOptions}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        sortOrder={sortOrder}
-        onSortOrderChange={setSortOrder}
-      />
-      <ProductList
-        products={paginatedProducts}
-        onEdit={openFormForEdit}
-        onDelete={(product) => setProductToDelete(product)}
-        onToggleFavorite={handleToggleFavorite}
-        onDuplicate={openFormForDuplicate} 
-      />
       
-      {clientHasMounted && baseFilteredAndSortedProducts.length > ITEMS_PER_PAGE && (
-         <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
+      {user ? (
+        <>
+          <Filters
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            categoryFilterOptions={categoryFilterOptions}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            sortOrder={sortOrder}
+            onSortOrderChange={setSortOrder}
           />
-      )}
 
-      <Button
-        onClick={openFormForAdd}
-        className="fixed bottom-8 right-8 h-16 w-16 rounded-full p-0 shadow-lg hover:shadow-xl transition-shadow z-50 flex items-center justify-center"
-        aria-label="Agregar Producto"
-      >
-        <Plus className="h-8 w-8" />
-      </Button>
+          <ProductList
+            products={paginatedProducts}
+            onEdit={openFormForEdit}
+            onDelete={(product) => setProductToDelete(product)}
+            onToggleFavorite={handleToggleFavorite}
+            onDuplicate={openFormForDuplicate}
+          />
 
-      <Dialog open={showFormDialog} onOpenChange={(isOpen) => {
-        setShowFormDialog(isOpen);
-        if (!isOpen) {
-            setEditingProduct(null);
-            setFormInitialValues(null); 
-        }
-      }}>
-        <DialogContent className="sm:max-w-xl">
-          <ProductForm
-            productToEdit={editingProduct}
-            initialDataForNew={formInitialValues}
-            userCategories={userCategories} 
-            onSubmit={(values, id) => {
-              if (id) { 
-                handleEditProduct(values, id);
-              } else { 
-                handleAddProduct(values);
-              }
-            }}
-            onCancel={() => {
-              setShowFormDialog(false);
+          {baseFilteredAndSortedProducts.length > ITEMS_PER_PAGE && (
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          )}
+
+          <Button
+            onClick={() => {
               setEditingProduct(null);
               setFormInitialValues(null);
+              setShowFormDialog(true);
             }}
-          />
-        </DialogContent>
-      </Dialog>
+            className="fixed bottom-8 right-8 h-16 w-16 rounded-full p-0 shadow-lg hover:shadow-xl transition-shadow z-50"
+            aria-label="Agregar Producto"
+          >
+            <Plus className="h-8 w-8" />
+          </Button>
 
-      <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro de eliminar este producto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. El producto "{productToDelete?.name}"
-              {productToDelete?.storeName ? ` de la tienda "${productToDelete.storeName}"` : ''}
-              será eliminado permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProduct}>Eliminar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <Dialog open={showFormDialog} onOpenChange={(isOpen) => {
+            if (!isOpen) resetFormState();
+            else setShowFormDialog(true);
+          }}>
+            <DialogContent className="sm:max-w-xl">
+              <ProductForm
+                productToEdit={editingProduct}
+                initialDataForNew={formInitialValues}
+                onSubmit={(values, id) => {
+                  if (id) {
+                    handleEditProduct(values, id);
+                  } else {
+                    handleAddProduct(values);
+                  }
+                }}
+                onCancel={resetFormState}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro de eliminar este producto?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. El producto "{productToDelete?.name}"
+                  {productToDelete?.storeName ? ` de la tienda "${productToDelete.storeName}"` : ''}
+                  será eliminado permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteProduct}>Eliminar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      ) : (
+        <div className="text-center mt-8">
+          <h2 className="text-2xl font-bold mb-4">¡Bienvenido a Dexter3000!</h2>
+          <p className="text-muted-foreground mb-4">
+            Inicia sesión para comenzar a gestionar tus productos y comparar precios entre diferentes ferias.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

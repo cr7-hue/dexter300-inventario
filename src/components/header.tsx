@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Package, Moon, Sun, Menu as MenuIcon, Home, BarChart3, Settings, LayoutList } from 'lucide-react'; // Added LayoutList
@@ -16,10 +15,13 @@ import {
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Separator } from './ui/separator';
+import { LoginButton } from './auth/LoginButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function AppHeader() {
   const [isDarkMode, setIsDarkMode] = useState(true); 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme');
@@ -83,28 +85,32 @@ export function AppHeader() {
                     </Button>
                   </Link>
                 </SheetClose>
-                <SheetClose asChild>
-                  <Link href="/stats" passHref>
-                    <Button variant="ghost" className="w-full justify-start text-base py-3">
-                      <BarChart3 className="mr-3 h-5 w-5" />
-                      Estadísticas
-                    </Button>
-                  </Link>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Link href="/settings/categories" passHref>
-                    <Button variant="ghost" className="w-full justify-start text-base py-3">
-                      <LayoutList className="mr-3 h-5 w-5" />
-                      Gestionar Categorías
-                    </Button>
-                  </Link>
-                </SheetClose>
-                 <SheetClose asChild>
-                  <Button variant="ghost" className="w-full justify-start text-base py-3" disabled>
-                    <Settings className="mr-3 h-5 w-5" />
-                    Otros Ajustes (Próximamente)
-                  </Button>
-                </SheetClose>
+                {user && (
+                  <>
+                    <SheetClose asChild>
+                      <Link href="/stats" passHref>
+                        <Button variant="ghost" className="w-full justify-start text-base py-3">
+                          <BarChart3 className="mr-3 h-5 w-5" />
+                          Estadísticas
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link href="/settings/categories" passHref>
+                        <Button variant="ghost" className="w-full justify-start text-base py-3">
+                          <LayoutList className="mr-3 h-5 w-5" />
+                          Gestionar Categorías
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Button variant="ghost" className="w-full justify-start text-base py-3" disabled>
+                        <Settings className="mr-3 h-5 w-5" />
+                        Otros Ajustes (Próximamente)
+                      </Button>
+                    </SheetClose>
+                  </>
+                )}
               </nav>
             </SheetContent>
           </Sheet>
@@ -113,15 +119,18 @@ export function AppHeader() {
             |dexter3000~
           </h1>
         </div>
-        <div className="flex items-center space-x-2">
-          <Sun className={`h-5 w-5 ${isDarkMode ? 'text-muted-foreground' : 'text-yellow-500'}`} />
-          <Switch
-            id="theme-switcher"
-            checked={isDarkMode}
-            onCheckedChange={toggleTheme}
-            aria-label="Cambiar tema"
-          />
-          <Moon className={`h-5 w-5 ${isDarkMode ? 'text-primary' : 'text-muted-foreground'}`} />
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Sun className={`h-5 w-5 ${isDarkMode ? 'text-muted-foreground' : 'text-yellow-500'}`} />
+            <Switch
+              id="theme-switcher"
+              checked={isDarkMode}
+              onCheckedChange={toggleTheme}
+              aria-label="Cambiar tema"
+            />
+            <Moon className={`h-5 w-5 ${isDarkMode ? 'text-primary' : 'text-muted-foreground'}`} />
+          </div>
+          <LoginButton />
         </div>
       </div>
       <p className="text-muted-foreground mt-1 pl-[52px] sm:pl-0">
