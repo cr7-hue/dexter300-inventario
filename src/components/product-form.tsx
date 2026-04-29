@@ -26,7 +26,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Product, ProductCategory } from "@/types";
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Store, MapPin, LocateFixed, ShoppingCart, Info, Edit, Copy } from "lucide-react"; // Added Copy
+import { Store, MapPin, LocateFixed, ShoppingCart, Info, Edit, Copy, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCategories } from "@/contexts/CategoryContext";
 
@@ -63,6 +63,7 @@ export function ProductForm({
 }: ProductFormProps) {
   const { toast } = useToast();
   const { categories } = useCategories();
+  const [isSuggestingCategory, setIsSuggestingCategory] = React.useState(false);
   
   const getDefaultValues = () => {
     if (productToEdit) {
@@ -100,6 +101,30 @@ export function ProductForm({
   React.useEffect(() => {
     form.reset(getDefaultValues());
   }, [productToEdit, initialDataForNew, categories, form]);
+
+  const productName = form.watch("name");
+
+  const handleSuggestCategory = async () => {
+    const name = form.getValues("name");
+    if (!name?.trim()) return;
+    setIsSuggestingCategory(true);
+    try {
+      const res = await fetch("/api/ai/suggest-category", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productName: name }),
+      });
+      if (res.ok) {
+        const { category } = await res.json();
+        form.setValue("category", category);
+        toast({ title: "Categoría sugerida", description: category });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo sugerir la categoría." });
+    } finally {
+      setIsSuggestingCategory(false);
+    }
+  };
 
   const handleSubmit = (values: ProductFormValues) => {
     const processedValues: ProductFormValues = {
@@ -224,7 +249,24 @@ export function ProductForm({
             name="category"
             render={({ field }) => (
               <FormItem>
-                <FormLabel htmlFor="product-category">Categoría</FormLabel>
+                <div className="flex items-center justify-between">
+                  <FormLabel htmlFor="product-category">Categoría</FormLabel>
+                  {productName?.trim() && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSuggestCategory}
+                      disabled={isSuggestingCategory}
+                      className="h-6 text-xs text-primary hover:bg-primary/10 px-2"
+                    >
+                      {isSuggestingCategory
+                        ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        : <Sparkles className="h-3 w-3 mr-1" />}
+                      Sugerir con IA
+                    </Button>
+                  )}
+                </div>
                 <Select
                   name="category"
                   value={field.value}
@@ -269,7 +311,7 @@ export function ProductForm({
                   Obtener Actual
                 </Button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="latitude"

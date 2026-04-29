@@ -37,8 +37,8 @@ export function PaginationControls({ currentPage, totalPages, onPageChange }: Pa
         disabled={currentPage === 1}
         aria-label="Página anterior"
       >
-        <ChevronLeft className="mr-1 sm:mr-2 h-4 w-4" />
-        Anterior
+        <ChevronLeft className="h-4 w-4" />
+        <span className="hidden sm:inline ml-1">Anterior</span>
       </Button>
       <span className="text-sm text-muted-foreground whitespace-nowrap">
         Página {currentPage} de {totalPages}
@@ -50,8 +50,8 @@ export function PaginationControls({ currentPage, totalPages, onPageChange }: Pa
         disabled={currentPage === totalPages}
         aria-label="Siguiente página"
       >
-        Siguiente
-        <ChevronRight className="ml-1 sm:ml-2 h-4 w-4" />
+        <span className="hidden sm:inline mr-1">Siguiente</span>
+        <ChevronRight className="h-4 w-4" />
       </Button>
     </div>
   );

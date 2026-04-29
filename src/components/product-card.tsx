@@ -121,11 +121,11 @@ export function ProductCard({ product, onEdit, onDelete, onToggleFavorite, onDup
           </p>
         )}
       </CardContent>
-      <CardFooter className="flex justify-end space-x-2 pt-3">
-        <Button variant="outline" size="sm" onClick={() => onEdit(product)} aria-label="Editar producto">
+      <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-3">
+        <Button variant="outline" size="sm" onClick={() => onEdit(product)} aria-label="Editar producto" className="w-full sm:w-auto">
           <Edit3 className="mr-2 h-4 w-4" /> Editar
         </Button>
-        <Button variant="destructive" size="sm" onClick={() => onDelete(product)} aria-label="Eliminar producto">
+        <Button variant="destructive" size="sm" onClick={() => onDelete(product)} aria-label="Eliminar producto" className="w-full sm:w-auto">
           <Trash2 className="mr-2 h-4 w-4" /> Eliminar
         </Button>
       </CardFooter>

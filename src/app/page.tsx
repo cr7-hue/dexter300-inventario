@@ -25,7 +25,7 @@ import { PaginationControls } from "@/components/pagination-controls";
 import { useProducts } from "@/contexts/ProductContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCategories } from "@/contexts/CategoryContext";
-import { nullable } from "zod";
+import { AiChat } from "@/components/ai-chat";
 
 const ITEMS_PER_PAGE = 4;
 const ALL_CATEGORIES_FILTER_VALUE = "Todas las categorías";
@@ -267,7 +267,7 @@ export default function HomePage() {
             if (!isOpen) resetFormState();
             else setShowFormDialog(true);
           }}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent className="max-w-[95vw] sm:max-w-xl">
               <ProductForm
                 productToEdit={editingProduct}
                 initialDataForNew={formInitialValues}
@@ -282,6 +282,8 @@ export default function HomePage() {
               />
             </DialogContent>
           </Dialog>
+
+          <AiChat products={products} />
 
           <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>
             <AlertDialogContent>

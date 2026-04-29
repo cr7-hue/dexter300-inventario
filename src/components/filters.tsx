@@ -40,7 +40,7 @@ export function Filters({
   onSortOrderChange,
 }: FiltersProps) {
   return (
-    <div className="mb-8 p-6 bg-card rounded-lg shadow">
+    <div className="mb-8 p-4 md:p-6 bg-card rounded-lg shadow">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
