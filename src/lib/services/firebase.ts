@@ -8,6 +8,8 @@ import {
   doc,
   serverTimestamp,
   DocumentData,
+  type UpdateData,
+  type WithFieldValue,
 } from 'firebase/firestore';
 import type { Product } from '@/types';
 
@@ -58,7 +60,7 @@ export const productService = {
         ...(productData as Record<string, unknown>),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      }) as WithFieldValue<DocumentData>;
       const docRef = await addDoc(productsRef, cleanedData);
       return docRef.id;
     } catch (error) {
@@ -73,7 +75,7 @@ export const productService = {
       const cleanedData = cleanUndefinedFields({
         ...(productData as Record<string, unknown>),
         updatedAt: serverTimestamp(),
-      });
+      }) as UpdateData<DocumentData>;
       await updateDoc(productRef, cleanedData);
     } catch (error) {
       console.error('Error updating product:', error);
