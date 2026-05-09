@@ -61,6 +61,17 @@ productService.deleteProduct(userId, productId)
 
 There is **no `categoryService`** — categories live only in localStorage via `CategoryContext`.
 
+#### Typing pattern for `cleanedData`
+
+`cleanUndefinedFields` returns `Record<string, unknown>` (intentionally strict — no `any`). The Firestore SDK's `addDoc` and `updateDoc` expect `WithFieldValue<T>` and `UpdateData<T>` respectively, which are stricter than `Record<string, unknown>`. The pattern in `addProduct`/`updateProduct` is:
+
+```ts
+const cleanedData = cleanUndefinedFields({ ... }) as UpdateData<DocumentData>;
+await updateDoc(productRef, cleanedData);
+```
+
+Use the same cast pattern if you add new write methods. Don't fall back to `as any`.
+
 ### Shared form logic
 
 `src/hooks/use-product-form-state.ts` (`useProductFormState`) centralizes all the dialog/form state and submit logic that's shared between `/` and `/stats`:
@@ -127,5 +138,6 @@ Font is **Inter** (Google Fonts), loaded in `src/app/layout.tsx` and exposed as 
 
 ## Build notes
 
-- `next.config.ts` **does not** suppress TypeScript or ESLint errors. A failing typecheck/lint will fail the build.
+- `next.config.ts` **does not** suppress TypeScript or ESLint errors. A failing typecheck/lint will fail the build (locally and on Vercel).
+- Always run `npm run typecheck` (or `npm run build`) before pushing to catch errors that the dev server is more permissive about.
 - The codebase uses strict imports — when adding new shared logic, prefer extracting to `src/hooks/` or `src/components/` rather than inlining in pages.

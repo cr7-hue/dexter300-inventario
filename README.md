@@ -137,4 +137,5 @@ El modo oscuro está **forzado** vía `<html className="dark">` en `layout.tsx` 
 
 - Las **categorías** se guardan en `localStorage` (key `shelfview_user_categories`), no en Firestore — si cambias de dispositivo o navegador, vuelven a las predeterminadas.
 - Los **productos** sí se persisten en Firestore por usuario.
-- `next.config.ts` ya **NO** suprime errores de TypeScript/ESLint en build. Si rompes algo, el build falla.
+- `next.config.ts` ya **NO** suprime errores de TypeScript/ESLint en build. Si rompes algo, el build falla (tanto local como en Vercel).
+- Antes de pushear, conviene correr `npm run typecheck` o `npm run build` — el dev server (Turbopack) es más permisivo que el build de producción y puede ocultar errores de tipos.
