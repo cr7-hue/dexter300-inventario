@@ -9,6 +9,7 @@ import { Trash2, PlusCircle, ArrowLeft, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { DEFAULT_PRODUCT_CATEGORIES, ProductCategory } from '@/types';
 import { AppHeader } from '@/components/header';
+import { LoadingSpinner } from '@/components/loading-spinner';
 import { useCategories } from '@/contexts/CategoryContext';
 import {
   AlertDialog,
@@ -84,13 +85,7 @@ export default function ManageCategoriesPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="min-h-screen p-4 md:p-8">

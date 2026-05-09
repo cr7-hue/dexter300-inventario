@@ -1,26 +1,17 @@
 import { db } from '../firebase/config';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  addDoc, 
+import {
+  collection,
+  getDocs,
+  addDoc,
   updateDoc,
   deleteDoc,
   doc,
   serverTimestamp,
-  DocumentData
+  DocumentData,
 } from 'firebase/firestore';
-import type { Product, ProductCategory } from '@/types';
+import type { Product } from '@/types';
 
-// Interfaces para los servicios
-interface FirestoreProduct extends Omit<Product, 'id'> {
-  createdAt: any;
-  updatedAt: any;
-}
-
-// Función para validar y transformar los datos del producto
-const validateAndTransformProduct = (id: string, data: any): Product => {
+const validateAndTransformProduct = (id: string, data: DocumentData): Product => {
   return {
     id,
     name: data.name || '',
@@ -34,32 +25,25 @@ const validateAndTransformProduct = (id: string, data: any): Product => {
     purchaseDate: data.isPurchased ? (data.purchaseDate || data.lastPriceCheck) : null,
     latitude: typeof data.latitude === 'number' ? data.latitude : null,
     longitude: typeof data.longitude === 'number' ? data.longitude : null,
-    priceHistory: Array.isArray(data.priceHistory) ? data.priceHistory.map((entry: any) => ({
-      price: typeof entry.price === 'number' ? entry.price : 0,
-      date: entry.date || new Date().toISOString()
-    })) : []
+    priceHistory: Array.isArray(data.priceHistory)
+      ? data.priceHistory.map((entry: DocumentData) => ({
+          price: typeof entry.price === 'number' ? entry.price : 0,
+          date: entry.date || new Date().toISOString(),
+        }))
+      : [],
   };
 };
 
-// Función para limpiar campos undefined
-const cleanUndefinedFields = (data: any) => {
-  const cleanedData = { ...data };
-  Object.keys(cleanedData).forEach(key => {
-    if (cleanedData[key] === undefined) {
-      delete cleanedData[key];
-    }
-  });
-  return cleanedData;
+const cleanUndefinedFields = (data: Record<string, unknown>): Record<string, unknown> => {
+  return Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
 };
 
-// Servicios para productos
+// Servicios para productos — cada usuario tiene su propia subcollección
 export const productService = {
-  // Obtener todos los productos
-  async getProducts(): Promise<Product[]> {
+  async getProducts(userId: string): Promise<Product[]> {
     try {
-      const productsRef = collection(db, 'products');
+      const productsRef = collection(db, 'users', userId, 'products');
       const snapshot = await getDocs(productsRef);
-      
       return snapshot.docs.map(doc => validateAndTransformProduct(doc.id, doc.data()));
     } catch (error) {
       console.error('Error getting products:', error);
@@ -67,16 +51,14 @@ export const productService = {
     }
   },
 
-  // Añadir un nuevo producto
-  async addProduct(productData: Omit<Product, 'id'>): Promise<string> {
+  async addProduct(userId: string, productData: Omit<Product, 'id'>): Promise<string> {
     try {
-      const productsRef = collection(db, 'products');
+      const productsRef = collection(db, 'users', userId, 'products');
       const cleanedData = cleanUndefinedFields({
-        ...productData,
+        ...(productData as Record<string, unknown>),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      
       const docRef = await addDoc(productsRef, cleanedData);
       return docRef.id;
     } catch (error) {
@@ -85,12 +67,11 @@ export const productService = {
     }
   },
 
-  // Actualizar un producto
-  async updateProduct(productId: string, productData: Partial<Product>): Promise<void> {
+  async updateProduct(userId: string, productId: string, productData: Partial<Product>): Promise<void> {
     try {
-      const productRef = doc(db, 'products', productId);
+      const productRef = doc(db, 'users', userId, 'products', productId);
       const cleanedData = cleanUndefinedFields({
-        ...productData,
+        ...(productData as Record<string, unknown>),
         updatedAt: serverTimestamp(),
       });
       await updateDoc(productRef, cleanedData);
@@ -100,63 +81,13 @@ export const productService = {
     }
   },
 
-  // Eliminar un producto
-  async deleteProduct(productId: string): Promise<void> {
+  async deleteProduct(userId: string, productId: string): Promise<void> {
     try {
-      const productRef = doc(db, 'products', productId);
+      const productRef = doc(db, 'users', userId, 'products', productId);
       await deleteDoc(productRef);
     } catch (error) {
       console.error('Error deleting product:', error);
       throw error;
     }
-  }
+  },
 };
-
-// Servicios para categorías
-export const categoryService = {
-  // Obtener todas las categorías
-  async getCategories(): Promise<ProductCategory[]> {
-    try {
-      const categoriesRef = collection(db, 'categories');
-      const snapshot = await getDocs(categoriesRef);
-      
-      return snapshot.docs.map(doc => doc.data().name as ProductCategory);
-    } catch (error) {
-      console.error('Error getting categories:', error);
-      throw error;
-    }
-  },
-
-  // Añadir una nueva categoría
-  async addCategory(categoryName: ProductCategory): Promise<void> {
-    try {
-      const categoriesRef = collection(db, 'categories');
-      await addDoc(categoriesRef, {
-        name: categoryName,
-        createdAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error('Error adding category:', error);
-      throw error;
-    }
-  },
-
-  // Eliminar una categoría
-  async deleteCategory(categoryName: ProductCategory): Promise<void> {
-    try {
-      const categoriesRef = collection(db, 'categories');
-      const q = query(
-        categoriesRef, 
-        where('name', '==', categoryName)
-      );
-      const snapshot = await getDocs(q);
-      
-      // Eliminar todos los documentos que coincidan
-      const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
-      await Promise.all(deletePromises);
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      throw error;
-    }
-  }
-}; 

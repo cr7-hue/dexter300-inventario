@@ -44,7 +44,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
 
       try {
         setLoading(true);
-        const fetchedProducts = await productService.getProducts();
+        const fetchedProducts = await productService.getProducts(user.uid);
         setProducts(fetchedProducts);
       } catch (err) {
         setError(err as Error);
@@ -72,7 +72,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const newProductId = await productService.addProduct(productData);
+      const newProductId = await productService.addProduct(user.uid, productData);
       const newProduct = { ...productData, id: newProductId };
       setProducts(prev => [newProduct, ...prev]);
       toast({
@@ -93,7 +93,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     try {
-      await productService.updateProduct(id, productData);
+      await productService.updateProduct(user.uid, id, productData);
       setProducts(prev =>
         prev.map(p => (p.id === id ? { ...p, ...productData } : p))
       );
@@ -115,7 +115,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     try {
-      await productService.deleteProduct(id);
+      await productService.deleteProduct(user.uid, id);
       setProducts(prev => prev.filter(p => p.id !== id));
       toast({
         title: "Éxito",
@@ -139,7 +139,7 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const newFavoriteStatus = !product.isFavorite;
-      await productService.updateProduct(id, { isFavorite: newFavoriteStatus });
+      await productService.updateProduct(user.uid, id, { isFavorite: newFavoriteStatus });
       setProducts(prev =>
         prev.map(p =>
           p.id === id ? { ...p, isFavorite: newFavoriteStatus } : p

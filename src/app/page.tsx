@@ -1,24 +1,11 @@
 "use client";
 
-import type { Product } from "@/types";
-import { DEFAULT_PRODUCT_CATEGORIES } from "@/types";
-import type { ProductFormValues } from "@/components/product-form";
 import { ProductForm } from "@/components/product-form";
 import { ProductList } from "@/components/product-list";
 import { Filters, type FilterOption } from "@/components/filters";
 import { AppHeader } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Plus } from "lucide-react";
 import { useState, useMemo } from "react";
 import { PaginationControls } from "@/components/pagination-controls";
@@ -26,6 +13,9 @@ import { useProducts } from "@/contexts/ProductContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCategories } from "@/contexts/CategoryContext";
 import { AiChat } from "@/components/ai-chat";
+import { LoadingSpinner } from "@/components/loading-spinner";
+import { DeleteProductDialog } from "@/components/delete-product-dialog";
+import { useProductFormState } from "@/hooks/use-product-form-state";
 
 const ITEMS_PER_PAGE = 4;
 const ALL_CATEGORIES_FILTER_VALUE = "Todas las categorías";
@@ -35,12 +25,20 @@ export default function HomePage() {
   const { user } = useAuth();
   const { products, loading, addProduct, updateProduct, deleteProduct, toggleFavorite } = useProducts();
   const { categories } = useCategories();
-  
-  const [showFormDialog, setShowFormDialog] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [formInitialValues, setFormInitialValues] = useState<ProductFormValues | null>(null);
-  
+
+  const {
+    editingProduct,
+    productToDelete,
+    setProductToDelete,
+    showFormDialog,
+    formInitialValues,
+    openFormForNew,
+    openFormForEdit,
+    openFormForDuplicate,
+    resetFormState,
+    handleFormSubmit,
+  } = useProductFormState({ products, addProduct, updateProduct });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORIES_FILTER_VALUE);
   const [sortBy, setSortBy] = useState<string>("default");
@@ -50,138 +48,39 @@ export default function HomePage() {
   const categoryFilterOptions: FilterOption[] = useMemo(() => [
     { value: ALL_CATEGORIES_FILTER_VALUE, label: "Todas las categorías" },
     { value: FAVORITES_FILTER_VALUE, label: "Solo Favoritos" },
-    ...categories.map(category => ({
-      value: category,
-      label: category
-    }))
+    ...categories.map(category => ({ value: category, label: category })),
   ], [categories]);
-
-  const handleAddProduct = (values: ProductFormValues) => {
-    const currentDate = new Date().toISOString();
-    const newProduct: Product = {
-      ...values,
-      id: Date.now().toString(),
-      isFavorite: false,
-      lastPriceCheck: currentDate,
-      priceHistory: [{ price: values.price, date: currentDate }],
-      isPurchased: values.isPurchased || false,
-      purchaseDate: values.isPurchased ? currentDate : undefined,
-      storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
-      latitude: values.latitude === undefined || values.latitude === null || isNaN(values.latitude) ? null : values.latitude,
-      longitude: values.longitude === undefined || values.longitude === null || isNaN(values.longitude) ? null : values.longitude,
-    };
-    addProduct(newProduct);
-    setShowFormDialog(false);
-    setFormInitialValues(null);
-  };
-
-  const handleEditProduct = (values: ProductFormValues, id: string) => {
-    if (!id) return;
-    
-    const productToUpdate = products.find(p => p.id === id);
-    if (!productToUpdate) return;
-
-    const currentDate = new Date().toISOString();
-    let updatedPriceHistory = productToUpdate.priceHistory ? [...productToUpdate.priceHistory] : [];
-    
-    if (values.price !== productToUpdate.price) {
-      updatedPriceHistory.unshift({ price: productToUpdate.price, date: productToUpdate.lastPriceCheck });
-    }
-
-    const wasPurchased = productToUpdate.isPurchased;
-    const isNowPurchased = values.isPurchased || false;
-    let newPurchaseDate = productToUpdate.purchaseDate;
-
-    if (isNowPurchased && !wasPurchased) {
-      newPurchaseDate = currentDate;
-    } else if (isNowPurchased && wasPurchased) {
-      newPurchaseDate = productToUpdate.purchaseDate || currentDate;
-    } else if (!isNowPurchased) {
-      newPurchaseDate = undefined;
-    }
-
-    const updatedProduct: Product = {
-      ...productToUpdate,
-      ...values,
-      storeName: values.storeName?.trim() === "" ? undefined : values.storeName,
-      latitude: values.latitude === undefined || values.latitude === null || isNaN(values.latitude) ? null : values.latitude,
-      longitude: values.longitude === undefined || values.longitude === null || isNaN(values.longitude) ? null : values.longitude,
-      lastPriceCheck: currentDate,
-      priceHistory: updatedPriceHistory,
-      isPurchased: isNowPurchased,
-      purchaseDate: newPurchaseDate,
-    };
-
-    updateProduct(id,updatedProduct);
-    setShowFormDialog(false);
-    setEditingProduct(null);
-  };
-
-  const handleDeleteProduct = () => {
-    if (productToDelete) {
-      deleteProduct(productToDelete.id);
-      setProductToDelete(null);
-    }
-  };
-
-  const handleToggleFavorite = (productId: string) => {
-    toggleFavorite(productId);
-  };
-
-  const openFormForEdit = (product: Product) => {
-    setEditingProduct(product);
-    setFormInitialValues(null);
-    setShowFormDialog(true);
-  };
-
-  const openFormForDuplicate = (product: Product) => {
-    setEditingProduct(null);
-    setFormInitialValues({
-      name: `${product.name} (Copia)`,
-      price: product.price,
-      category: product.category,
-      storeName: product.storeName || "",
-      notes: product.notes || "",
-      latitude: product.latitude || null,
-      longitude: product.longitude || null,
-      isPurchased: false,
-    });
-    setShowFormDialog(true);
-  };
 
   const baseFilteredAndSortedProducts = useMemo(() => {
     let tempProducts = [...products];
 
     if (selectedCategory === FAVORITES_FILTER_VALUE) {
-      tempProducts = tempProducts.filter(product => product.isFavorite);
+      tempProducts = tempProducts.filter(p => p.isFavorite);
     } else if (selectedCategory !== ALL_CATEGORIES_FILTER_VALUE) {
-      tempProducts = tempProducts.filter(product => product.category === selectedCategory);
+      tempProducts = tempProducts.filter(p => p.category === selectedCategory);
     }
 
     if (searchTerm.trim() !== "") {
-      tempProducts = tempProducts.filter((product) =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.storeName && product.storeName.toLowerCase().includes(searchTerm.toLowerCase()))
+      const term = searchTerm.toLowerCase();
+      tempProducts = tempProducts.filter(p =>
+        p.name.toLowerCase().includes(term) ||
+        (p.storeName && p.storeName.toLowerCase().includes(term))
       );
     }
 
     if (sortBy !== "default") {
       tempProducts.sort((a, b) => {
         let comparison = 0;
-        if (sortBy === "name") {
-          comparison = a.name.localeCompare(b.name);
-        } else if (sortBy === "price") {
-          comparison = a.price - b.price;
-        } else if (sortBy === "storeName") {
-          comparison = (a.storeName || '').localeCompare(b.storeName || '');
-        } else if (sortBy === "lastPriceCheck") {
-          comparison = new Date(b.lastPriceCheck).getTime() - new Date(a.lastPriceCheck).getTime();
-        }
+        if (sortBy === "name") comparison = a.name.localeCompare(b.name);
+        else if (sortBy === "price") comparison = a.price - b.price;
+        else if (sortBy === "storeName") comparison = (a.storeName || '').localeCompare(b.storeName || '');
+        else if (sortBy === "lastPriceCheck") comparison = new Date(b.lastPriceCheck).getTime() - new Date(a.lastPriceCheck).getTime();
         return sortOrder === "asc" ? comparison : -comparison;
       });
     } else {
       tempProducts.sort((a, b) => new Date(b.lastPriceCheck).getTime() - new Date(a.lastPriceCheck).getTime());
     }
+
     return tempProducts;
   }, [products, searchTerm, selectedCategory, sortBy, sortOrder]);
 
@@ -191,36 +90,19 @@ export default function HomePage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleFormSubmit = (values: ProductFormValues) => {
-    if (editingProduct) {
-      handleEditProduct(values, editingProduct.id);
-    } else {
-      handleAddProduct(values);
+  const handleDeleteProduct = () => {
+    if (productToDelete) {
+      deleteProduct(productToDelete.id);
+      setProductToDelete(null);
     }
   };
 
-  const resetFormState = () => {
-    setShowFormDialog(false);
-    setEditingProduct(null);
-    setFormInitialValues(null);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="min-h-screen p-4 md:p-8">
       <AppHeader />
-      
+
       {user ? (
         <>
           <Filters
@@ -238,8 +120,8 @@ export default function HomePage() {
           <ProductList
             products={paginatedProducts}
             onEdit={openFormForEdit}
-            onDelete={(product) => setProductToDelete(product)}
-            onToggleFavorite={handleToggleFavorite}
+            onDelete={setProductToDelete}
+            onToggleFavorite={toggleFavorite}
             onDuplicate={openFormForDuplicate}
           />
 
@@ -247,37 +129,24 @@ export default function HomePage() {
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
-              onPageChange={handlePageChange}
+              onPageChange={setCurrentPage}
             />
           )}
 
           <Button
-            onClick={() => {
-              setEditingProduct(null);
-              setFormInitialValues(null);
-              setShowFormDialog(true);
-            }}
-            className="fixed bottom-8 right-8 h-16 w-16 rounded-full p-0 shadow-lg hover:shadow-xl transition-shadow z-50"
+            onClick={openFormForNew}
+            className="fixed bottom-6 right-6 h-16 w-16 rounded-2xl p-0 gradient-violet glow-primary border-0 hover:scale-105 active:scale-95 transition-transform z-50"
             aria-label="Agregar Producto"
           >
-            <Plus className="h-8 w-8" />
+            <Plus className="h-7 w-7 text-white" />
           </Button>
 
-          <Dialog open={showFormDialog} onOpenChange={(isOpen) => {
-            if (!isOpen) resetFormState();
-            else setShowFormDialog(true);
-          }}>
-            <DialogContent className="max-w-[95vw] sm:max-w-xl">
+          <Dialog open={showFormDialog} onOpenChange={(isOpen) => { if (!isOpen) resetFormState(); }}>
+            <DialogContent className="max-w-[95vw] sm:max-w-xl glass-strong rounded-3xl border-border/60 p-5 sm:p-6">
               <ProductForm
                 productToEdit={editingProduct}
                 initialDataForNew={formInitialValues}
-                onSubmit={(values, id) => {
-                  if (id) {
-                    handleEditProduct(values, id);
-                  } else {
-                    handleAddProduct(values);
-                  }
-                }}
+                onSubmit={handleFormSubmit}
                 onCancel={resetFormState}
               />
             </DialogContent>
@@ -285,34 +154,29 @@ export default function HomePage() {
 
           <AiChat products={products} />
 
-          <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás seguro de eliminar este producto?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acción no se puede deshacer. El producto "{productToDelete?.name}"
-                  {productToDelete?.storeName ? ` de la tienda "${productToDelete.storeName}"` : ''}
-                  será eliminado permanentemente.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteProduct}>Eliminar</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <DeleteProductDialog
+            product={productToDelete}
+            onConfirm={handleDeleteProduct}
+            onCancel={() => setProductToDelete(null)}
+          />
         </>
       ) : (
-        <div className="text-center mt-8">
-          <h2 className="text-2xl font-bold mb-4">¡Bienvenido a Dexter3000!</h2>
-          <p className="text-muted-foreground mb-4">
-            Inicia sesión para comenzar a gestionar tus productos y comparar precios entre diferentes ferias.
-          </p>
+        <div className="flex flex-col items-center justify-center mt-12 sm:mt-20 px-4">
+          <div className="glass glow-card rounded-3xl p-8 sm:p-12 max-w-md w-full text-center relative overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full blur-3xl bg-primary/20 pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 rounded-full blur-3xl bg-amber-500/15 pointer-events-none" />
+            <h2 className="relative text-3xl sm:text-4xl font-bold mb-3 gradient-text">
+              Bienvenido
+            </h2>
+            <p className="relative text-muted-foreground mb-2">
+              Tu inventario inteligente de precios.
+            </p>
+            <p className="relative text-sm text-muted-foreground/80 mb-6">
+              Inicia sesión para comenzar a gestionar tus productos y comparar precios entre diferentes ferias.
+            </p>
+          </div>
         </div>
       )}
     </div>
   );
 }
-    
-
-    

@@ -79,19 +79,21 @@ export function AiChat({ products }: AiChatProps) {
     <>
       <Button
         onClick={handleOpen}
-        className="fixed bottom-8 left-8 h-14 w-14 rounded-full p-0 shadow-lg hover:shadow-xl transition-shadow z-50"
+        className="fixed bottom-6 left-6 h-14 w-14 rounded-2xl p-0 gradient-violet-gold border-0 shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95 transition-transform z-50"
         aria-label="Abrir asistente IA"
         title="Asistente IA"
       >
-        <Sparkles className="h-6 w-6" />
+        <Sparkles className="h-5 w-5 text-white" />
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md h-[80vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-4 pt-4 pb-3 border-b shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Asistente IA
+        <DialogContent className="max-w-[95vw] sm:max-w-md h-[80vh] flex flex-col p-0 gap-0 glass-strong rounded-3xl border-border/60">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b border-border/50 shrink-0">
+            <DialogTitle className="flex items-center gap-2.5 text-base">
+              <div className="h-8 w-8 rounded-xl gradient-violet-gold flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <span className="gradient-text font-bold">Asistente IA</span>
             </DialogTitle>
           </DialogHeader>
 

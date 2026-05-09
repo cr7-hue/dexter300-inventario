@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Moon, Sun, Menu as MenuIcon, Home, BarChart3, Settings, LayoutList } from 'lucide-react'; // Added LayoutList
+import { Package, Moon, Sun, Menu as MenuIcon, Home, BarChart3, Settings, LayoutList } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import { LoginButton } from './auth/LoginButton';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function AppHeader() {
-  const [isDarkMode, setIsDarkMode] = useState(true); 
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { user } = useAuth();
 
@@ -27,19 +27,12 @@ export function AppHeader() {
     const storedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    if (storedTheme === 'dark') {
+    if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
       setIsDarkMode(true);
       document.documentElement.classList.add('dark');
-    } else if (storedTheme === 'light') {
+    } else {
       setIsDarkMode(false);
       document.documentElement.classList.remove('dark');
-    } else {
-      setIsDarkMode(prefersDark);
-      if (prefersDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
     }
   }, []);
 
@@ -57,29 +50,36 @@ export function AppHeader() {
 
   return (
     <header className="mb-8">
-      <div className="flex items-center justify-between">
+      <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="mr-2">
-                <MenuIcon className="h-6 w-6" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-xl bg-secondary/50 hover:bg-primary/15 hover:text-primary"
+              >
+                <MenuIcon className="h-5 w-5" />
                 <span className="sr-only">Abrir menú</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[280px] sm:w-[320px]">
+            <SheetContent side="left" className="w-[280px] sm:w-[320px] glass-strong border-r border-border/60">
               <SheetHeader className="mb-6">
                 <SheetTitle className="text-2xl flex items-center">
-                  <Package className="h-7 w-7 mr-2 text-primary" /> |dexter3000~
+                  <div className="h-9 w-9 rounded-xl gradient-violet flex items-center justify-center mr-2 shadow-lg shadow-primary/30">
+                    <Package className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="gradient-text font-bold">|dexter3000~</span>
                 </SheetTitle>
                 <SheetDescription>
                   Menú de navegación principal.
                 </SheetDescription>
               </SheetHeader>
-              <Separator className="mb-4" />
-              <nav className="flex flex-col space-y-2">
+              <Separator className="mb-4 opacity-50" />
+              <nav className="flex flex-col space-y-1.5">
                 <SheetClose asChild>
                   <Link href="/" passHref>
-                    <Button variant="ghost" className="w-full justify-start text-base py-3">
+                    <Button variant="ghost" className="w-full justify-start text-base py-5 rounded-xl hover:bg-primary/10 hover:text-primary">
                       <Home className="mr-3 h-5 w-5" />
                       Inicio
                     </Button>
@@ -89,7 +89,7 @@ export function AppHeader() {
                   <>
                     <SheetClose asChild>
                       <Link href="/stats" passHref>
-                        <Button variant="ghost" className="w-full justify-start text-base py-3">
+                        <Button variant="ghost" className="w-full justify-start text-base py-5 rounded-xl hover:bg-primary/10 hover:text-primary">
                           <BarChart3 className="mr-3 h-5 w-5" />
                           Estadísticas
                         </Button>
@@ -97,14 +97,14 @@ export function AppHeader() {
                     </SheetClose>
                     <SheetClose asChild>
                       <Link href="/settings/categories" passHref>
-                        <Button variant="ghost" className="w-full justify-start text-base py-3">
+                        <Button variant="ghost" className="w-full justify-start text-base py-5 rounded-xl hover:bg-primary/10 hover:text-primary">
                           <LayoutList className="mr-3 h-5 w-5" />
                           Gestionar Categorías
                         </Button>
                       </Link>
                     </SheetClose>
                     <SheetClose asChild>
-                      <Button variant="ghost" className="w-full justify-start text-base py-3" disabled>
+                      <Button variant="ghost" className="w-full justify-start text-base py-5 rounded-xl opacity-50" disabled>
                         <Settings className="mr-3 h-5 w-5" />
                         Otros Ajustes (Próximamente)
                       </Button>
@@ -114,26 +114,41 @@ export function AppHeader() {
               </nav>
             </SheetContent>
           </Sheet>
-          <Package className="h-10 w-10 text-primary hidden sm:block" />
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight bg-gradient-to-br from-primary via-primary to-accent bg-clip-text text-transparent">
-            |dexter3000~
-          </h1>
+
+          <Link href="/" className="flex items-center space-x-2.5 group">
+            <div className="h-10 w-10 rounded-xl gradient-violet flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-shadow">
+              <Package className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight gradient-text">
+              |dexter3000~
+            </h1>
+          </Link>
         </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Sun className={`h-5 w-5 ${isDarkMode ? 'text-muted-foreground' : 'text-yellow-500'}`} />
+
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="hidden sm:flex items-center space-x-2 px-2 py-1 rounded-full bg-secondary/50">
+            <Sun className={`h-4 w-4 transition-colors ${isDarkMode ? 'text-muted-foreground' : 'text-[hsl(var(--gold))]'}`} />
             <Switch
               id="theme-switcher"
               checked={isDarkMode}
               onCheckedChange={toggleTheme}
               aria-label="Cambiar tema"
             />
-            <Moon className={`h-5 w-5 ${isDarkMode ? 'text-primary' : 'text-muted-foreground'}`} />
+            <Moon className={`h-4 w-4 transition-colors ${isDarkMode ? 'text-primary' : 'text-muted-foreground'}`} />
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="sm:hidden h-10 w-10 rounded-xl bg-secondary/50 hover:bg-primary/15"
+            aria-label="Cambiar tema"
+          >
+            {isDarkMode ? <Moon className="h-4 w-4 text-primary" /> : <Sun className="h-4 w-4 text-[hsl(var(--gold))]" />}
+          </Button>
           <LoginButton />
         </div>
       </div>
-      <p className="text-muted-foreground mt-1 pl-[52px] sm:pl-0">
+      <p className="text-muted-foreground mt-3 text-sm pl-1">
         Encuentra los mejores precios, ¡y recuerda dónde!
       </p>
     </header>
